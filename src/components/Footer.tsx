@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { Mail, Plane } from "lucide-react"
+import { Mail } from "lucide-react"
 
 import { scrollToSection } from "@/lib/utils"
 import { FOOTER_DISCLAIMER_TEXT } from "@/content/disclaimer"
@@ -17,27 +17,22 @@ const LINK_COLUMNS = [
     title: "Company",
     links: [
       { label: "About Us", href: "/about" },
+      { label: "Contact us", href: "/contact" },
       { label: "Careers", href: "#" },
       { label: "Press & media", href: "#" },
       { label: "Partner with us", href: "#" },
     ],
   },
   {
-    title: "Support",
+    title: "Legal",
     links: [
-      { label: "Help center", href: "#" },
-      { label: "Manage booking", href: "#" },
-      { label: "Contact us", href: "/contact" },
+      { label: "Terms of Service", href: "/terms" },
+      { label: "Privacy Policy", href: "#" },
+      { label: "Cookie Policy", href: "/cookie-policy" },
+      { label: "Disclaimer", href: "/disclaimer" },
+      { label: "Accessibility", href: "#" },
     ],
   },
-] as const
-
-const LEGAL_LINKS = [
-  { label: "Terms of Service", href: "/terms" },
-  { label: "Privacy Policy", href: "#" },
-  { label: "Cookie Policy", href: "/cookie-policy" },
-  { label: "Disclaimer", href: "/disclaimer" },
-  { label: "Accessibility", href: "#" },
 ] as const
 
 function FooterLink({
@@ -56,7 +51,15 @@ function FooterLink({
 
   if (isRoute) {
     return (
-      <Link to={href} className={className}>
+      <Link
+        to={href}
+        className={className}
+        onClick={() => {
+          if (location.pathname === href) {
+            window.scrollTo({ top: 0, behavior: "smooth" })
+          }
+        }}
+      >
         {children}
       </Link>
     )
@@ -105,14 +108,18 @@ export function Footer() {
                 if (location.pathname === "/") {
                   e.preventDefault()
                   scrollToSection("top")
+                } else {
+                  window.scrollTo({ top: 0, left: 0 })
                 }
               }}
-              className="inline-flex items-center gap-2.5 text-lg font-bold text-foreground"
+              className="inline-flex items-center"
+              aria-label="Flight Air home"
             >
-              <span className="flex size-9 items-center justify-center rounded-xl bg-linear-to-br from-primary to-blue-600 text-primary-foreground shadow-sm">
-                <Plane className="size-4.5 -rotate-45" />
-              </span>
-              Flight Air
+              <img
+                src="/logo.svg"
+                alt="Flight Air"
+                className="h-9 w-auto sm:h-11"
+              />
             </Link>
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
               {FOOTER_DISCLAIMER_TEXT}
@@ -177,30 +184,9 @@ export function Footer() {
           </div>
         </div>
 
-        {/* Legal */}
-        <div className="mt-10 border-t border-border pt-8">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-foreground/70">
-            Legal
-          </h4>
-          <nav
-            aria-label="Legal"
-            className="mt-4 flex flex-wrap gap-x-6 gap-y-2"
-          >
-            {LEGAL_LINKS.map((link) => (
-              <FooterLink
-                key={link.label}
-                href={link.href}
-                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {link.label}
-              </FooterLink>
-            ))}
-          </nav>
-        </div>
-
         {/* Bottom bar */}
-        <div className="mt-8 border-t border-border pt-6">
-          <p className="text-xs text-muted-foreground">
+        <div className="mt-10 border-t border-border pt-6">
+          <p className="text-center text-xs text-muted-foreground">
             © {year} Flight Air. All rights reserved.
           </p>
         </div>

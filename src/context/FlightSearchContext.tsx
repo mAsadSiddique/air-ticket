@@ -11,13 +11,59 @@ import { generateMockResults, type FlightResult } from "@/data/flights"
 
 export type TripType = "roundtrip" | "oneway"
 
+export interface PassengerCounts {
+  adults: number
+  children: number
+  infants: number
+}
+
+export const DEFAULT_PASSENGERS: PassengerCounts = {
+  adults: 1,
+  children: 0,
+  infants: 0,
+}
+
+export function normalizePassengers(value: unknown): PassengerCounts {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return {
+      adults: Math.min(9, Math.max(1, Math.floor(value))),
+      children: 0,
+      infants: 0,
+    }
+  }
+
+  if (!value || typeof value !== "object") {
+    return { ...DEFAULT_PASSENGERS }
+  }
+
+  const raw = value as Partial<PassengerCounts>
+  const adults = Number(raw.adults)
+  const children = Number(raw.children)
+  const infants = Number(raw.infants)
+
+  return {
+    adults: Number.isFinite(adults) ? Math.min(9, Math.max(1, Math.floor(adults))) : 1,
+    children: Number.isFinite(children)
+      ? Math.min(9, Math.max(0, Math.floor(children)))
+      : 0,
+    infants: Number.isFinite(infants)
+      ? Math.min(9, Math.max(0, Math.floor(infants)))
+      : 0,
+  }
+}
+
 export interface SearchFormState {
   tripType: TripType
   fromCode: string
   toCode: string
   departDate: string
   returnDate: string
-  passengers: number
+  passengers: PassengerCounts
+}
+
+export function totalPassengers(p: PassengerCounts): number {
+  const counts = normalizePassengers(p)
+  return counts.adults + counts.children + counts.infants
 }
 
 export type SearchFormErrors = Partial<Record<keyof SearchFormState, string>>
@@ -42,7 +88,7 @@ const initialForm: SearchFormState = {
   toCode: "",
   departDate: "",
   returnDate: "",
-  passengers: 1,
+  passengers: { ...DEFAULT_PASSENGERS },
 }
 
 const FlightSearchContext = createContext<FlightSearchContextValue | null>(
@@ -58,7 +104,13 @@ export function FlightSearchProvider({ children }: { children: ReactNode }) {
 
   const setField = useCallback(
     <K extends keyof SearchFormState>(key: K, value: SearchFormState[K]) => {
-      setForm((prev) => ({ ...prev, [key]: value }))
+      setForm((prev) => ({
+        ...prev,
+        [key]:
+          key === "passengers"
+            ? normalizePassengers(value)
+            : value,
+      }))
       setErrors((prev) => ({ ...prev, [key]: undefined }))
     },
     []

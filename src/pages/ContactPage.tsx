@@ -91,6 +91,8 @@ type FormState = {
   confirmed: boolean
 }
 
+type FormErrors = Partial<Record<keyof FormState, string>>
+
 const INITIAL_FORM: FormState = {
   firstName: "",
   lastName: "",
@@ -99,6 +101,73 @@ const INITIAL_FORM: FormState = {
   subject: "",
   message: "",
   confirmed: false,
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const NAME_RE = /^[\p{L}\s'-]+$/u
+const PHONE_RE = /^[+]?[\d\s().-]{7,20}$/
+
+function validateForm(form: FormState): FormErrors {
+  const errors: FormErrors = {}
+
+  const firstName = form.firstName.trim()
+  if (!firstName) {
+    errors.firstName = "First name is required."
+  } else if (firstName.length < 2) {
+    errors.firstName = "Enter at least 2 characters."
+  } else if (!NAME_RE.test(firstName)) {
+    errors.firstName = "Use letters only (spaces, hyphens, and apostrophes allowed)."
+  }
+
+  const lastName = form.lastName.trim()
+  if (!lastName) {
+    errors.lastName = "Last name is required."
+  } else if (lastName.length < 2) {
+    errors.lastName = "Enter at least 2 characters."
+  } else if (!NAME_RE.test(lastName)) {
+    errors.lastName = "Use letters only (spaces, hyphens, and apostrophes allowed)."
+  }
+
+  const email = form.email.trim()
+  if (!email) {
+    errors.email = "Email address is required."
+  } else if (!EMAIL_RE.test(email)) {
+    errors.email = "Enter a valid email address."
+  }
+
+  const phone = form.phone.trim()
+  if (phone && !PHONE_RE.test(phone)) {
+    errors.phone = "Enter a valid phone number."
+  }
+
+  const subject = form.subject.trim()
+  if (!subject) {
+    errors.subject = "Subject is required."
+  } else if (subject.length < 3) {
+    errors.subject = "Enter at least 3 characters."
+  }
+
+  const message = form.message.trim()
+  if (!message) {
+    errors.message = "Please enter your message."
+  } else if (message.length < 10) {
+    errors.message = "Message should be at least 10 characters."
+  }
+
+  if (!form.confirmed) {
+    errors.confirmed = "Please confirm the information is accurate."
+  }
+
+  return errors
+}
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null
+  return (
+    <p id={id} role="alert" className="text-xs font-medium text-destructive">
+      {message}
+    </p>
+  )
 }
 
 function ContactInfoItem({
@@ -139,22 +208,39 @@ function ContactInfoItem({
 
 export function ContactPage() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
+  const [errors, setErrors] = useState<FormErrors>({})
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const updateField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
+    setErrors((prev) => {
+      if (!prev[key]) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
   }
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!form.confirmed) return
+    const nextErrors = validateForm(form)
+    setErrors(nextErrors)
+
+    if (Object.keys(nextErrors).length > 0) {
+      const firstErrorKey = Object.keys(nextErrors)[0]
+      const el = document.getElementById(firstErrorKey)
+      el?.focus()
+      el?.scrollIntoView({ behavior: "smooth", block: "center" })
+      return
+    }
 
     setSubmitting(true)
     await new Promise((resolve) => setTimeout(resolve, 800))
     setSubmitting(false)
     setSubmitted(true)
     setForm(INITIAL_FORM)
+    setErrors({})
   }
 
   return (
@@ -204,7 +290,10 @@ export function ContactPage() {
                   type="button"
                   variant="outline"
                   className="mt-6"
-                  onClick={() => setSubmitted(false)}
+                  onClick={() => {
+                    setSubmitted(false)
+                    setErrors({})
+                  }}
                 >
                   Send another message
                 </Button>
@@ -213,34 +302,44 @@ export function ContactPage() {
               <form className="mt-8 space-y-5" onSubmit={handleSubmit} noValidate>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
+                    <Label htmlFor="firstName">
+                      First Name <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="firstName"
                       name="firstName"
                       placeholder="John"
                       value={form.firstName}
                       onChange={(e) => updateField("firstName", e.target.value)}
-                      required
+                      aria-invalid={!!errors.firstName}
+                      aria-describedby={errors.firstName ? "firstName-error" : undefined}
                       autoComplete="given-name"
                     />
+                    <FieldError id="firstName-error" message={errors.firstName} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
+                    <Label htmlFor="lastName">
+                      Last Name <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="lastName"
                       name="lastName"
                       placeholder="Smith"
                       value={form.lastName}
                       onChange={(e) => updateField("lastName", e.target.value)}
-                      required
+                      aria-invalid={!!errors.lastName}
+                      aria-describedby={errors.lastName ? "lastName-error" : undefined}
                       autoComplete="family-name"
                     />
+                    <FieldError id="lastName-error" message={errors.lastName} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
+                    <Label htmlFor="email">
+                      Email Address <span className="text-destructive">*</span>
+                    </Label>
                     <Input
                       id="email"
                       name="email"
@@ -248,9 +347,11 @@ export function ContactPage() {
                       placeholder="john.smith@email.com"
                       value={form.email}
                       onChange={(e) => updateField("email", e.target.value)}
-                      required
+                      aria-invalid={!!errors.email}
+                      aria-describedby={errors.email ? "email-error" : undefined}
                       autoComplete="email"
                     />
+                    <FieldError id="email-error" message={errors.email} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number</Label>
@@ -261,53 +362,72 @@ export function ContactPage() {
                       placeholder="+1 (555) 000-0000"
                       value={form.phone}
                       onChange={(e) => updateField("phone", e.target.value)}
+                      aria-invalid={!!errors.phone}
+                      aria-describedby={errors.phone ? "phone-error" : undefined}
                       autoComplete="tel"
                     />
+                    <FieldError id="phone-error" message={errors.phone} />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="subject">Subject</Label>
+                  <Label htmlFor="subject">
+                    Subject <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="subject"
                     name="subject"
                     placeholder="Booking enquiry, flight change, feedback…"
                     value={form.subject}
                     onChange={(e) => updateField("subject", e.target.value)}
-                    required
+                    aria-invalid={!!errors.subject}
+                    aria-describedby={errors.subject ? "subject-error" : undefined}
                   />
+                  <FieldError id="subject-error" message={errors.subject} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="message">Your Message</Label>
+                  <Label htmlFor="message">
+                    Your Message <span className="text-destructive">*</span>
+                  </Label>
                   <Textarea
                     id="message"
                     name="message"
                     placeholder="Tell us how we can help — include your booking reference if you have one."
                     value={form.message}
                     onChange={(e) => updateField("message", e.target.value)}
-                    required
+                    aria-invalid={!!errors.message}
+                    aria-describedby={errors.message ? "message-error" : undefined}
                   />
+                  <FieldError id="message-error" message={errors.message} />
                 </div>
 
                 <div className="flex flex-col gap-5 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-                  <label className="flex cursor-pointer items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={form.confirmed}
-                      onChange={(e) => updateField("confirmed", e.target.checked)}
-                      className="mt-0.5 size-4 shrink-0 rounded border-input accent-primary"
-                      required
-                    />
-                    <span className="text-sm leading-relaxed text-muted-foreground">
-                      I confirm the information provided is accurate.
-                    </span>
-                  </label>
+                  <div className="space-y-1.5">
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input
+                        id="confirmed"
+                        type="checkbox"
+                        checked={form.confirmed}
+                        onChange={(e) => updateField("confirmed", e.target.checked)}
+                        aria-invalid={!!errors.confirmed}
+                        aria-describedby={
+                          errors.confirmed ? "confirmed-error" : undefined
+                        }
+                        className="mt-0.5 size-4 shrink-0 rounded border-input accent-primary aria-invalid:outline-2 aria-invalid:outline-offset-1 aria-invalid:outline-destructive"
+                      />
+                      <span className="text-sm leading-relaxed text-muted-foreground">
+                        I confirm the information provided is accurate.{" "}
+                        <span className="text-destructive">*</span>
+                      </span>
+                    </label>
+                    <FieldError id="confirmed-error" message={errors.confirmed} />
+                  </div>
 
                   <Button
                     type="submit"
                     size="lg"
-                    disabled={submitting || !form.confirmed}
+                    disabled={submitting}
                     className="w-full shrink-0 rounded-xl px-8 shadow-md shadow-primary/20 sm:w-auto"
                   >
                     {submitting ? "Sending…" : "Send Message"}

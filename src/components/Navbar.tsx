@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { Menu, Phone, Plane, X } from "lucide-react"
+import { Menu, Phone, X } from "lucide-react"
 import { motion } from "framer-motion"
 
 import { cn, scrollToSection } from "@/lib/utils"
@@ -167,12 +167,14 @@ export function Navbar() {
             }
             setActive("top")
           }}
-          className="flex shrink-0 items-center gap-2 text-lg font-bold text-primary"
+          className="flex shrink-0 items-center"
+          aria-label="Flight Air home"
         >
-          <span className="flex size-9 items-center justify-center rounded-2xl bg-linear-to-br from-primary to-blue-600 text-primary-foreground shadow-md shadow-primary/25">
-            <Plane className="size-5 -rotate-45" />
-          </span>
-          <span className="hidden sm:inline">Flight Air</span>
+          <img
+            src="/logo.svg"
+            alt="Flight Air"
+            className="h-9 w-auto sm:h-11"
+          />
         </Link>
 
         {/* Center pill nav */}

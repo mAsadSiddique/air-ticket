@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useState } from "react"
 import {
   ArrowLeftRight,
   CalendarDays,
@@ -15,7 +15,12 @@ import { format } from "date-fns"
 
 import { cn } from "@/lib/utils"
 import { cities } from "@/data/flights"
-import { useFlightSearch } from "@/context/FlightSearchContext"
+import {
+  normalizePassengers,
+  totalPassengers,
+  useFlightSearch,
+  type PassengerCounts,
+} from "@/context/FlightSearchContext"
 import {
   Select,
   SelectContent,
@@ -327,102 +332,138 @@ function DateField({
 }
 
 function PassengerSelector({
-  count,
+  value,
   onChange,
   variant = "boxed",
   className,
 }: {
-  count: number
-  onChange: (n: number) => void
+  value: PassengerCounts
+  onChange: (next: PassengerCounts) => void
   variant?: Variant
   className?: string
 }) {
   const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const counts = normalizePassengers(value)
+  const total = totalPassengers(counts)
+
+  const update = (key: keyof PassengerCounts, delta: number) => {
+    const current = counts[key]
+    const nextValue = current + delta
+    if (!Number.isFinite(nextValue)) return
+
+    const next = normalizePassengers({ ...counts, [key]: nextValue })
+
+    if (key === "adults" && next.adults < 1) return
+    if (key !== "adults" && next[key] < 0) return
+    if (next.infants > next.adults) return
+    if (totalPassengers(next) > 9) return
+
+    onChange(next)
+  }
+
+  const rows: {
+    key: keyof PassengerCounts
+    label: string
+    min: number
+    maxDisabled: boolean
+  }[] = [
+    {
+      key: "adults",
+      label: "Adults [+12]",
+      min: 1,
+      maxDisabled: total >= 9,
+    },
+    {
+      key: "children",
+      label: "Children [2-12]",
+      min: 0,
+      maxDisabled: total >= 9,
+    },
+    {
+      key: "infants",
+      label: "Infants [0-2]",
+      min: 0,
+      maxDisabled: total >= 9 || counts.infants >= counts.adults,
+    },
+  ]
 
   const trigger =
     variant === "bar" ? (
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={cn(segmentClass, "w-full")}
-      >
+      <button type="button" className={cn(segmentClass, "w-full")}>
         <span className={labelClass}>Passengers</span>
         <span className="mt-1 flex items-center gap-2">
           <span className={barIconBadgeClass}>
             <Users className="size-4" />
           </span>
           <span className="truncate text-sm font-semibold text-foreground">
-            {count} {count === 1 ? "Traveler" : "Travelers"}
+            {total} {total === 1 ? "Traveler" : "Travelers"}
           </span>
           <ChevronDown className="ml-auto size-3.5 text-muted-foreground/70" />
         </span>
       </button>
     ) : (
-      <div className={fieldWrapClass}>
-        <label className={labelClass}>Passengers</label>
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className={cn(boxedClass, "text-left")}
-        >
-          <FieldIcon>
-            <Users />
-          </FieldIcon>
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold leading-none text-foreground">
-            {count} {count === 1 ? "Traveler" : "Travelers"}
-          </span>
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground/70" />
-        </button>
-      </div>
+      <button
+        type="button"
+        className={cn(boxedClass, "w-full text-left")}
+      >
+        <FieldIcon>
+          <Users />
+        </FieldIcon>
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold leading-none text-foreground">
+          {total} {total === 1 ? "Traveler" : "Travelers"}
+        </span>
+        <ChevronDown className="size-4 shrink-0 text-muted-foreground/70" />
+      </button>
     )
 
-  return (
-    <div className={cn("relative min-w-0", className)} ref={containerRef}>
-      {trigger}
-
-      <AnimatePresence>
-        {open && (
-          <>
-            <div
-              className="fixed inset-0 z-10"
-              onClick={() => setOpen(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: -8, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.98 }}
-              transition={{ duration: 0.15 }}
-              className="absolute right-0 top-full z-20 mt-2 flex min-w-[220px] items-center justify-between rounded-xl border border-border bg-popover p-4 shadow-xl"
-            >
-              <span className="text-sm font-semibold text-popover-foreground">
-                Travelers
+  const content = (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent align="end" className="w-[240px] p-4">
+        <div className="flex flex-col gap-4">
+          {rows.map(({ key, label, min, maxDisabled }) => (
+            <div key={key} className="flex flex-col items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wide text-foreground">
+                {label}
               </span>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <button
                   type="button"
-                  aria-label="Decrease passengers"
-                  disabled={count <= 1}
-                  onClick={() => onChange(Math.max(1, count - 1))}
-                  className="flex size-8 items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:border-primary/40 disabled:opacity-30"
+                  aria-label={`Decrease ${key}`}
+                  disabled={counts[key] <= min}
+                  onClick={() => update(key, -1)}
+                  className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/15 disabled:opacity-30"
                 >
                   <Minus className="size-3.5" />
                 </button>
-                <span className="w-5 text-center text-sm font-bold">{count}</span>
+                <span className="flex h-9 w-11 items-center justify-center rounded-lg border border-primary/25 bg-background text-sm font-bold text-foreground tabular-nums">
+                  {counts[key]}
+                </span>
                 <button
                   type="button"
-                  aria-label="Increase passengers"
-                  disabled={count >= 9}
-                  onClick={() => onChange(Math.min(9, count + 1))}
-                  className="flex size-8 items-center justify-center rounded-full border border-border bg-background text-foreground transition-colors hover:border-primary/40 disabled:opacity-30"
+                  aria-label={`Increase ${key}`}
+                  disabled={maxDisabled}
+                  onClick={() => update(key, 1)}
+                  className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/15 disabled:opacity-30"
                 >
                   <Plus className="size-3.5" />
                 </button>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+            </div>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+
+  if (variant === "bar") {
+    return <div className={cn("relative min-w-0", className)}>{content}</div>
+  }
+
+  return (
+    <div className={cn(fieldWrapClass, className)}>
+      <label className={labelClass}>Passengers</label>
+      {content}
     </div>
   )
 }
@@ -588,8 +629,8 @@ export function FlightSearchCard() {
             <span className="my-1.5 w-px shrink-0 bg-slate-200/80 dark:bg-white/10" />
 
             <PassengerSelector
-              count={form.passengers}
-              onChange={(n) => setField("passengers", n)}
+              value={form.passengers}
+              onChange={(next) => setField("passengers", next)}
               variant="bar"
               className="min-w-36"
             />
@@ -659,8 +700,8 @@ export function FlightSearchCard() {
           </AnimatePresence>
 
           <PassengerSelector
-            count={form.passengers}
-            onChange={(n) => setField("passengers", n)}
+            value={form.passengers}
+            onChange={(next) => setField("passengers", next)}
             className="w-full"
           />
           <SearchButton

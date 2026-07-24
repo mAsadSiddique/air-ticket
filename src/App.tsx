@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom"
 
 import { Navbar } from "@/components/Navbar"
 import { Footer } from "@/components/Footer"
+import { ScrollToTop } from "@/components/ScrollToTop"
 import { HomePage } from "@/pages/HomePage"
 import { ContactPage } from "@/pages/ContactPage"
 import { CookiePolicyPage } from "@/pages/CookiePolicyPage"
@@ -14,6 +15,7 @@ function App() {
   return (
     <FlightSearchProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <div className="min-h-screen bg-background text-foreground">
           <Navbar />
           <Routes>
